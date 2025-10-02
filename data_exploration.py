@@ -1,4 +1,5 @@
 # Exploring data and building preliminary structures for Bayesian networks
+# Original data available at https://osf.io/szvwa/files/osfstorage, use other script to convert to .npy files
 # Caleb Bessit
 # 29 September 2025
 

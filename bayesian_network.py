@@ -4,6 +4,7 @@
 
 from pylab import *
 import pyagrum as gum
+import os
 
 # Create network
 bn = gum.BayesNet('FreelyMovingThoughts')
@@ -23,7 +24,7 @@ The 6 features with the largest normalized differences between freely-moving/non
 '''
 
 # Names of variables, structures as features + target
-names = ['p3_mean', 'alpha_sure','p3_std', 'p3_sure','rt_var','p3_shannon'] + ['freely moving?']
+names = ['p3_mean', 'alpha_sure','p3_std', 'p3_sure','rt_var','p3_shannon'] + ['freely_moving']
 
 id_p3_mean, id_alpha_sure, id_p3_std, id_p3_sure, id_rt_var, id_p3_shannon, id_freely_moving = [bn.add(name, 2) for name in names]
 
@@ -52,3 +53,13 @@ bn.cpt("p3_shannon").fillWith([0.5,0.5])
 
 # Would have to cater for 2{number of variables}=2^6=64 cases if we treat it as all features linked to fr-node directly
 # Will maybe assume some relationship between P3 variables
+
+for i in range(1<<6):
+    digits =  [int(digit) for digit in f"{bin(i)[2:].zfill(6)}"]
+    combined = dict(zip(names[:-1], digits))
+    bn.cpt("freely_moving")[combined] = [0.5, 0.5]
+
+outdir = "bayesian_networks/"
+os.makedirs(outdir, exist_ok=True)
+gum.saveBN(bn, os.path.join(outdir, f"FreelyMovingThoughts.dot"))
+print(bn)

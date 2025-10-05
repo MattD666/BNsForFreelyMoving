@@ -4,62 +4,84 @@
 
 from pylab import *
 import pyagrum as gum
+import matplotlib.pyplot as plt
+import pyagrum.lib.image as gumimage
 import os
 
 # Create network
-bn = gum.BayesNet('FreelyMovingThoughts')
-
-# Add variables
-'''
-The 6 features with the largest normalized differences between freely-moving/non-freely-moving samples are:
-
-    1. P3 mean
-    2. sure alpha
-    3. P3 STD
-    4. sure P3
-    5. reaction time variability
-    6. shannon P3
+bn = gum.InfluenceDiagram()
 
 
-'''
+parent_node             = ['freely_moving_thoughts']
+alpha_features          = ['alpha_var','alpha_kurt','alpha_shan']
+erp_features            = ['p3_kurt']
+behavioural_features    = ['rt_mean','rt_var','ra']
+other_features          = ['pupil_dil']
 
-# Names of variables, structures as features + target
-names = ['p3_mean', 'alpha_sure','p3_std', 'p3_sure','rt_var','p3_shannon'] + ['freely_moving']
+# Create layers of features
+feature_layer_1 = alpha_features + behavioural_features + other_features
+feature_layer_2 = erp_features
 
-id_p3_mean, id_alpha_sure, id_p3_std, id_p3_sure, id_rt_var, id_p3_shannon, id_freely_moving = [bn.add(name, 2) for name in names]
+names = parent_node + feature_layer_1 + feature_layer_2
 
+
+id_freely_moving, id_alpha_var, id_alpha_kurt, id_alpha_shan, id_rt_mean, id_rt_var, id_ra, id_pupil_dil, id_p3_kurt = [bn.add(name, 2) for name in names]
+
+
+arc_links = [
+    # FMT -> alphas
+    (id_freely_moving, id_alpha_var),
+    (id_freely_moving, id_alpha_kurt),
+    (id_freely_moving, id_alpha_shan),
+
+    # FMT -> behavioural
+    (id_freely_moving, id_rt_mean),
+    (id_freely_moving, id_rt_var),
+    (id_freely_moving, id_ra),
+
+    # FMT -> pupil dilation
+    (id_freely_moving, id_pupil_dil),
+
+    # FMT and Alpha features -> ERP feature
+    # (id_freely_moving, id_p3_kurt),
+
+    (id_alpha_var, id_p3_kurt),
+    (id_alpha_kurt, id_p3_kurt),
+    (id_alpha_shan, id_p3_kurt),
+]
 # Create arcs
-for link in [
-    (id_p3_mean, id_freely_moving),
-    (id_alpha_sure, id_freely_moving),
-    (id_p3_std, id_freely_moving),
-    (id_p3_sure, id_freely_moving),
-    (id_rt_var, id_freely_moving),
-    (id_p3_shannon, id_freely_moving),
-]:
+for link in arc_links:
     bn.addArc(*link)
 
-print(bn)
+# Extension for decision network: if we observe freely moving thoughts, we should nudge the user to get their attention
+id_decision = bn.addDecisionNode("notify_user", 2)
+id_utility  = bn.addUtilityNode("utility")
+
+bn.addArc("freely_moving_thoughts","utility")
+bn.addArc("notify_user","utility")
 
 # Topology created, now create probability tables.
 
-# Individual variables
-bn.cpt("p3_mean").fillWith([0.5,0.5])
-bn.cpt("alpha_sure").fillWith([0.5,0.5])
-bn.cpt("p3_std").fillWith([0.5,0.5])
-bn.cpt("p3_sure").fillWith([0.5,0.5])
-bn.cpt("rt_var").fillWith([0.5,0.5])
-bn.cpt("p3_shannon").fillWith([0.5,0.5])
+# Do it in layers: start with parent node, then for every node in feature layer 1 and then every node in feature layer 2
+# Parent node:
+bn.cpt(parent_node[0]).fillWith([0.5,0.5])
 
-# Would have to cater for 2{number of variables}=2^6=64 cases if we treat it as all features linked to fr-node directly
-# Will maybe assume some relationship between P3 variables
+# # Feature layer one: has parent node as only parent
+for child in feature_layer_1:
+    bn.cpt(child)[{parent_node[0]: 0}] = [0.5, 0.5]
+    bn.cpt(child)[{parent_node[0]: 1}] = [0.5, 0.5]
 
-for i in range(1<<6):
-    digits =  [int(digit) for digit in f"{bin(i)[2:].zfill(6)}"]
-    combined = dict(zip(names[:-1], digits))
-    bn.cpt("freely_moving")[combined] = [0.5, 0.5]
+# # Feature layer 2: P3 node which has alpha nodes as parents
+for i in range (8):
+    bitmap              = [int(digit) for digit in f"{bin(i)[2:].zfill(3)}"] #Take index i and convert it to a list of binary digits. This helps us cover all combinations of alpha features being on/off
+    features_and_states = dict(zip(alpha_features, bitmap))  #We have a dictionary of alpha_feature:value, e.g. when i = 5, the binary representation is 101, so we have {'alpha_var':1, 'alpha_kurt':0, 'alpha_shan':1}
+    bn.cpt(erp_features[0])[features_and_states] = [0.5,0.5]
+    
 
-outdir = "bayesian_networks/"
-os.makedirs(outdir, exist_ok=True)
-gum.saveBN(bn, os.path.join(outdir, f"FreelyMovingThoughts.dot"))
-print(bn)
+# Table for utility function
+bn.utility("utility")[{"freely_moving_thoughts":1, "notify_user":1}] = 10    #notifying the user when they have freely-moving thoughts is very good
+bn.utility("utility")[{"freely_moving_thoughts":0, "notify_user":0}] = 5     #not notifying the user when they are not having freely-moving thoughts is also good (neutral?)
+bn.utility("utility")[{"freely_moving_thoughts":1, "notify_user":0}] = -1    #not notifying the user when they are having freely-moving thoughts is not good
+bn.utility("utility")[{"freely_moving_thoughts":0, "notify_user":1}] = -10   #notifying the user when they are not having freely-moving thoughts (potentially distracting them) is very bad
+
+gumimage.export(bn, "bayesian_networks/network.pdf")

@@ -64,19 +64,38 @@ bn.addArc("notify_user","utility")
 
 # Do it in layers: start with parent node, then for every node in feature layer 1 and then every node in feature layer 2
 # Parent node:
-bn.cpt(parent_node[0]).fillWith([0.5,0.5])
+fmt_prob = 0.495260663507109
+bn.cpt(parent_node[0]).fillWith([1-fmt_prob,fmt_prob])
+
+# Extract conditional probabilities
+probs = []
+with open("prob.txt") as prob_file:
+    for line in prob_file:
+        probs.append(line.split(','))
+probs = np.array(probs)
 
 # # Feature layer one: has parent node as only parent
 for child in feature_layer_1:
-    bn.cpt(child)[{parent_node[0]: 0}] = [0.5, 0.5]
-    bn.cpt(child)[{parent_node[0]: 1}] = [0.5, 0.5]
+    try:
+        prob = probs[(probs[:, 0] == "freely_moving_thoughts") & (probs[:, 1] == child)][0]
+        bn.cpt(child)[{parent_node[0]: 0}] = [float(prob[2]), 1-float(prob[2])]
+        bn.cpt(child)[{parent_node[0]: 1}] = [float(prob[3]), 1-float(prob[3])]
+    except:
+        bn.cpt(child)[{parent_node[0]: 0}] = [0.5, 0.5]
+        bn.cpt(child)[{parent_node[0]: 1}] = [0.5, 0.5]
 
 # # Feature layer 2: P3 node which has alpha nodes as parents
 for i in range (8):
     bitmap              = [int(digit) for digit in f"{bin(i)[2:].zfill(3)}"] #Take index i and convert it to a list of binary digits. This helps us cover all combinations of alpha features being on/off
     features_and_states = dict(zip(alpha_features, bitmap))  #We have a dictionary of alpha_feature:value, e.g. when i = 5, the binary representation is 101, so we have {'alpha_var':1, 'alpha_kurt':0, 'alpha_shan':1}
-    bn.cpt(erp_features[0])[features_and_states] = [0.5,0.5]
-    
+    final_prob = 1
+    for j in range(len(bitmap)):
+        prob = probs[(probs[:, 0] == alpha_features[j]) & (probs[:, 1] == erp_features[0])][0]
+        if bitmap[j]:
+            final_prob *= float(prob[3])
+        else:
+            final_prob *= float(prob[2])
+    bn.cpt(erp_features[0])[features_and_states] = [final_prob,1-final_prob]
 
 # Table for utility function
 bn.utility("utility")[{"freely_moving_thoughts":1, "notify_user":1}] = 10    #notifying the user when they have freely-moving thoughts is very good
@@ -84,4 +103,4 @@ bn.utility("utility")[{"freely_moving_thoughts":0, "notify_user":0}] = 5     #no
 bn.utility("utility")[{"freely_moving_thoughts":1, "notify_user":0}] = -1    #not notifying the user when they are having freely-moving thoughts is not good
 bn.utility("utility")[{"freely_moving_thoughts":0, "notify_user":1}] = -10   #notifying the user when they are not having freely-moving thoughts (potentially distracting them) is very bad
 
-gumimage.export(bn, "bayesian_networks/network.pdf")
+# gumimage.export(bn, "bayesian_networks/network.pdf")

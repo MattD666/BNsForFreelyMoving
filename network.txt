@@ -1,0 +1,4 @@
+alpha_var,alpha_kurt,alpha_shan,rt_mean,rt_var,ra
+alpha_var->p3_kurt
+alpha_kurt->p3_kurt
+alpha_shan->p3_kurt

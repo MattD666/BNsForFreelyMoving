@@ -7,7 +7,7 @@ import itertools
 import numpy as np
 import pandas as pd
 import pyagrum as gum
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, brier_score_loss
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, balanced_accuracy_score
 
 
 
@@ -36,7 +36,7 @@ feat_index = dict( zip( chosen_features, [original_features.index(feature) for f
 overall_labels, overall_features = None, None
 for subject in range(subject_range[0], subject_range[1]):
     subject_id = f"{subject+1:02d}"
-    subject_data = np.load(f"NP_Data/S1{subject_id}_data.npy")
+    subject_data = np.load(f"test_bin_digits/S1{subject_id}_binary_digit_data.npy")
 
     print(subject_data.shape)
 
@@ -55,15 +55,14 @@ print(trials)
 ### INFERENCE
 #################################
 
-# Helper: run posterior given evidence dict (pyAgrum LazyPropagation)
+
 def posterior_prob(target_var, evidence):
-    ie = gum.LazyPropagation(bn)  # good for repeated single queries
-    # set evidence expects dict varname->state (int)
+    ie = gum.LazyPropagation(bn)  
     if evidence:
         ie.setEvidence(evidence)
     ie.makeInference()
-    post = ie.posterior(target_var).toarray()  # returns array [P(0), P(1)]
-    return float(post[1])  # return P(target=1)
+    post = ie.posterior(target_var).toarray()  
+    return float(post[1])  
 
 def evidence_from_trial(i, subset):
     ev = {}
@@ -80,7 +79,7 @@ def evaluate_subset_across_trials(subset):
     best_actions = []
     for i in range(trials):
         ev = evidence_from_trial(i, subset)
-        p1 = posterior_prob('freely_moving_thoughts', ev)
+        p1 = posterior_prob('freely_moving_thoughts', ev) #Can change targets here based on evidence and see how things go
         prob = p1
         pred = 1 if prob >= 0.5 else 0
         preds.append(pred)
@@ -91,29 +90,30 @@ def evaluate_subset_across_trials(subset):
         # eus.append(eu)
     # metrics
     acc = accuracy_score(trues, preds)
+    bal_acc = balanced_accuracy_score(trues, preds)
     prec = precision_score(trues, preds, zero_division=0)
     rec = recall_score(trues, preds, zero_division=0)
     f1 = f1_score(trues, preds, zero_division=0)
-    brier = brier_score_loss(trues, probs)
+
     # avg confidence: mean probability assigned to the chosen class
     chosen_confidences = []
-    for p, pred in zip(probs, preds):
-        chosen_confidences.append(p if pred==1 else (1.0-p))
+    for prob, pred in zip(probs, preds):
+        chosen_confidences.append(prob if pred==1 else (1.0-prob))
     avg_confidence = float(np.mean(chosen_confidences))
     result = {
         'subset': subset,
         'n_trials': trials,
         'acc': acc,
+        'bal_acc': bal_acc,
         'prec': prec,
         'rec': rec,
         'f1': f1,
-        'brier': brier,
         'avg_confidence': avg_confidence,
     }
     #     'mean_prob_pos': float(np.mean(probs)),
     #     'prop_action1': float(np.mean(best_actions)),  # fraction of subjects where action=1 chosen
     # }
-    return result, {'preds': preds, 'probs': probs} #, 'actions': best_actions, 'eus': eus}
+    return result, {'preds': preds, 'probs': probs} 
 
 
 results = []
@@ -165,7 +165,7 @@ print("All-features result:", res_all)
 outdir = "results"
 os.makedirs(outdir, exist_ok=True)
 df_results = pd.DataFrame(results)
-df_results = df_results.sort_values(['label','acc'], ascending=[True, False])
+df_results = df_results.sort_values(['acc'], ascending=[False])
 out_csv = "inference_results_summary.csv"
 df_results.to_csv( os.path.join(outdir, out_csv), index=False)
 print(f"Saved summary to {os.path.join(outdir, out_csv)}.")

@@ -24,13 +24,14 @@ features = ['p3_mean', 'p3_STD', 'alpha_mean', 'alpha_var',
             'alpha_kurt']
 
 # Can change the below up to 15
-subjects = 14
+subjects = 10
 
 # Aggregate data structure
 overall_comb, overall_fr, overall_nfr = None, None, None
 
 for i in range(subjects):
     subject_id = f"{i+1:02d}"
+    print(f"Doing {subject_id}")
     
     # Load this subject's test file
     test = np.load(f"NP_Data/S1{subject_id}_data.npy")

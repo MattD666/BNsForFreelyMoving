@@ -9,8 +9,8 @@ import pyagrum.lib.image as gumimage
 import os
 
 # Create network
-bn = gum.InfluenceDiagram()
-
+# bn = gum.InfluenceDiagram()
+bn = gum.BayesNet('FreelyMovingThoughts')
 
 parent_node             = ['freely_moving_thoughts']
 alpha_features          = ['alpha_var','alpha_kurt','alpha_shan']
@@ -54,11 +54,11 @@ for link in arc_links:
     bn.addArc(*link)
 
 # Extension for decision network: if we observe freely moving thoughts, we should nudge the user to get their attention
-id_decision = bn.addDecisionNode("notify_user", 2)
-id_utility  = bn.addUtilityNode("utility")
+# id_decision = bn.addDecisionNode("notify_user", 2)
+# id_utility  = bn.addUtilityNode("utility")
 
-bn.addArc("freely_moving_thoughts","utility")
-bn.addArc("notify_user","utility")
+# bn.addArc("freely_moving_thoughts","utility")
+# bn.addArc("notify_user","utility")
 
 # Topology created, now create probability tables.
 
@@ -97,10 +97,14 @@ for i in range (8):
             final_prob *= float(prob[2])
     bn.cpt(erp_features[0])[features_and_states] = [final_prob,1-final_prob]
 
+outdir = "bayesian_networks/"
+os.makedirs(outdir, exist_ok=True)
+gum.saveBN(bn, os.path.join(outdir, f"FreelyMovingThoughts.bif"))
+
 # Table for utility function
-bn.utility("utility")[{"freely_moving_thoughts":1, "notify_user":1}] = 10    #notifying the user when they have freely-moving thoughts is very good
-bn.utility("utility")[{"freely_moving_thoughts":0, "notify_user":0}] = 5     #not notifying the user when they are not having freely-moving thoughts is also good (neutral?)
-bn.utility("utility")[{"freely_moving_thoughts":1, "notify_user":0}] = -1    #not notifying the user when they are having freely-moving thoughts is not good
-bn.utility("utility")[{"freely_moving_thoughts":0, "notify_user":1}] = -10   #notifying the user when they are not having freely-moving thoughts (potentially distracting them) is very bad
+# bn.utility("utility")[{"freely_moving_thoughts":1, "notify_user":1}] = 10    #notifying the user when they have freely-moving thoughts is very good
+# bn.utility("utility")[{"freely_moving_thoughts":0, "notify_user":0}] = 5     #not notifying the user when they are not having freely-moving thoughts is also good (neutral?)
+# bn.utility("utility")[{"freely_moving_thoughts":1, "notify_user":0}] = -1    #not notifying the user when they are having freely-moving thoughts is not good
+# bn.utility("utility")[{"freely_moving_thoughts":0, "notify_user":1}] = -10   #notifying the user when they are not having freely-moving thoughts (potentially distracting them) is very bad
 
 # gumimage.export(bn, "bayesian_networks/network.pdf")
